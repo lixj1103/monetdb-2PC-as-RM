@@ -59,17 +59,17 @@ sql>INSERT INTO account VALUES ( 1, '22345', 3000 );
 sql>commit;
 auto commit mode: on
 
-　	　	　	                   取值	别名	           类型	长度-字节	备注
-开始标志	开始标识	logformat.flag  	1    LOG_START	char	1	　
-	　	      logformat.nr            4	　            long    8	　
-	   事务id	     logformat.tid           4	　	    int	    4	事务标志
-操作类型    操作类型	logformat.flag 	        3    LOG_INSERT	char	1	　
-	   值个数　	   logformat.nr	           2	　	long	8	　
-	   事务id	     logformat.tid           4	　	int	4	　
-BAT1	   列名	     列名长度	         20	　	int	4	　
-		       schema_表名_列名	“sys_account_bank_nr”	　	string	20	字符串具体长度
-	   列值1	    值	                    1	　	int	4	bank_nr的类型
-	   列值2	    值	                    1		int		
+　	　	　	取值	别名	类型	长度-字节	备注
+开始标志	开始标识	logformat.flag 	1	LOG_START	char	1	　
+	　	logformat.nr	4	　	long	8	　
+	事务id	logformat.tid	4	　	int	4	事务标志
+操作类型	操作类型	logformat.flag 	3	LOG_INSERT	char	1	　
+	值个数　	logformat.nr	2	　	long	8	　
+	事务id	logformat.tid	4	　	int	4	　
+BAT1	列名	列名长度	20	　	int	4	　
+		schema_表名_列名	“sys_account_bank_nr”	　	string	20	字符串具体长度
+	列值1	值	1	　	int	4	bank_nr的类型
+	列值2	值	1		int		
 操作类型	　	logformat.flag 	3	LOG_INSERT	char	1	　
 	值个数	logformat.nr	2	　	long	8	　
 	　	logformat.tid	4	　	int	4	　
