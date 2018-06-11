@@ -1,0 +1,119 @@
+redo日志格式
+格式整理
+redo日志是以二进制格式打印的，不是直接可读的字符。下面是通过gdb跟踪找出的日志的格式。
+
+日志名：sql_logs/sql/log.8
+日志文件名 log.8,扩展名的数字是一个序号
+日志格式：
+
+事务开始标识	
+操作类型	c1	c1_value1	c1_value2	
+操作类型	c2	…	
+操作类型	cn	value。。。	事务结束标识
+
+事务开始标志：flag：开始标志 char，值为1，即LOG_START.  1字节
+              nr:  Long型的数字，与tid相等  8字节
+              tid:  Int型tid，事务id        4字节
+列更新记录：
+这部分是一个列一个列的写，先写第一个列的所有变更记录，再写第二个列的所有更新记录，依次写后面的列。
+
+1）操作类型：
+flag： 操作标识 char 1字节，
+         Flag的取值范围：
+#define LOG_START 	1    //log_tstart()写这个类型的日志
+#define LOG_END		2
+#define LOG_INSERT	3
+#define LOG_DELETE	4
+#define LOG_UPDATE	5
+#define LOG_CREATE	6
+#define LOG_DESTROY	7
+#define LOG_USE		8
+#define LOG_CLEAR	9
+#define LOG_SEQ		10
+
+nr：Long型的数字, 变更记录行数
+tid：事务id。
+  
+ 2）列名 ：包括两部分，长度（int类型），指完整列名的长度；完整列名字符串“schema_表名_列名”。
+ 3）列值 ：该列所有的变动的值，如果是int类型，则直接写int值
+        如果是string类型，写长度（int类型）+ value；
+        一共写nr个列值
+
+事务结束标识：flag：开始标志 char，值为2，即LOG_END.  1字节
+              nr:  Long型的数字， 8字节，
+当nr=-1时，表示abort；
+当nr=tid时，表示commit
+              tid:  Int型tid，事务id        4字节
+
+
+例1、insert
+执行以下sql，写的redo日志如下表格：
+sql>start transaction;
+auto commit mode: off
+sql>INSERT INTO account VALUES ( 1, '22344', 2000 );
+1 affected row (12.868ms)
+sql>INSERT INTO account VALUES ( 1, '22345', 3000 );
+1 affected row (12.868ms)
+sql>commit;
+auto commit mode: on
+
+　	　	　	取值	别名	类型	长度-字节	备注
+开始标志	开始标识	logformat.flag 	1	LOG_START	char	1	　
+	　	logformat.nr	4	　	long	8	　
+	事务id	logformat.tid	4	　	int	4	事务标志
+操作类型	操作类型	logformat.flag 	3	LOG_INSERT	char	1	　
+	值个数　	logformat.nr	2	　	long	8	　
+	事务id	logformat.tid	4	　	int	4	　
+BAT1	列名	列名长度	20	　	int	4	　
+		schema_表名_列名	“sys_account_bank_nr”	　	string	20	字符串具体长度
+	列值1	值	1	　	int	4	bank_nr的类型
+	列值2	值	1		int		
+操作类型	　	logformat.flag 	3	LOG_INSERT	char	1	　
+	值个数	logformat.nr	2	　	long	8	　
+	　	logformat.tid	4	　	int	4	　
+BAT2	列名	len	23	　	int	4	　
+		schema_表名_列名	“sys_account_account_nr”	　	string	23	schema_表名_列名
+	列值1	strWrite-值长度	5	　	int	4	　
+		strWrite-值	"22344"	　	string	6	account_nr的类型
+	列值2	strWrite-值长度	5		int	4	
+		strWrite-值	"22345"		string	6	
+操作类型	　	logformat.flag 	3	LOG_INSERT	char	1	　
+	　	logformat.nr	2	　	long	8	　
+	　	logformat.tid	4	　	int	4	　
+BAT3	列名	列名长度	18	　	int	4	　
+		schema_表名_列名	"sys_account_saldo"	　	string	18	　
+	列值1	列值 intWrite	2000	　	int	4	saldo的类型
+	列值2	列值 intWrite	3000		int	4	
+结束标志	结束标识	logformat.flag	2	LOG_END	char	1	　
+	　	logformat.nr	4	　	long	8	　
+	事务id	logformat.tid	4	　	int	4	　
+
+例2：update
+update account set account_nr='11111' where bank_nr=1;
+不写undo日志，redo是记录的计算后的实际值。
+
+开始标志	开始标识	logformat.flag 	1	LOG_START	char	1
+	事务id	logformat.nr	11	　	long	8
+	事务id	logformat.tid	11	　	int	4
+操作类型	操作标志	logformat.flag 	5	LOG_UPDATE	char	1
+	记录数	logformat.nr	1	　	long	8
+	事务id	logformat.tid	11	　	int	4
+BAT1	列名	列名长度	23	　	int	4
+		schema_表名_列名	“sys_account_account_nr”	　	string	23
+	列值	strWrite-值长度	5	　	int	4
+		strWrite-值	"11111"	　	string	5
+结束标志	结束标识	logformat.flag 	2	LOG_END	char	1
+	事务id	logformat.nr	11	　	long	8
+	事务id	logformat.tid	11	　	int	4
+
+例3、create table
+Monetdb的表管理
+有三个表管理相关的系统表：
+1、schemas 存放schema信息
+2、sys._tables 存放表信息
+3、sys._columns 存放列信息
+
+创建表写事务日志过程：
+1、	首先insert一条记录到 系统表 "sys._tables "  name、
+2、	Insert各列信息记录到 系统表 "sys._columns "  name、 type、type_digits等字段
+
