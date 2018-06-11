@@ -111,7 +111,7 @@ BAT1	列名	列名长度	23	　	int	4
 例3、create table
 Monetdb的表管理
 有三个表管理相关的系统表：
-1、schemas 存放schema信息
+1、sys.schemas 存放schema信息
 2、sys._tables 存放表信息
 3、sys._columns 存放列信息
 
